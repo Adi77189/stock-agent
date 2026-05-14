@@ -57,3 +57,17 @@ def stop_scheduler():
     if scheduler.running:
         scheduler.shutdown()
         print("[Scheduler] Stopped")
+
+def check_token_daily():
+    from agent.token_manager import refresh_upstox_token
+    result = refresh_upstox_token()
+    print(f"[Token Check] {result['status']}: {result['message']}")
+
+# Add this job in start_scheduler()
+scheduler.add_job(
+    func     = check_token_daily,
+    trigger  = CronTrigger(hour=8, minute=45),
+    id       = "daily_token_check",
+    name     = "Daily Token Validator",
+    replace_existing = True
+)

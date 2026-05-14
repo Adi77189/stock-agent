@@ -239,3 +239,36 @@ def rebalance_check(user_id: str):
     mood    = get_market_mood()
     last_dt = trades[0]["created_at"] if trades else "2020-01-01"
     return sanitize(should_rebalance(last_dt, mood.get("mood","NEUTRAL")))
+@app.get("/notify-mood")
+def notify_mood():
+    from agent.tools.market_mood import get_market_mood
+    from agent.notifications import notify_market_mood
+    mood = get_market_mood()
+    notify_market_mood(mood)
+    return {"status": "notification sent", "mood": mood["mood"]}
+@app.get("/pnl/{user_id}")
+def get_pnl(user_id: str):
+    from agent.tools.pnl_tracker import calculate_pnl
+    return sanitize(calculate_pnl(user_id))
+@app.get("/backtest/{symbol}")
+def backtest_symbol(symbol: str,
+                    months: int = 6):
+    from agent.tools.backtest import backtest_stock
+    from datetime import datetime, timedelta
+    end   = datetime.now().strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=months*30)).strftime("%Y-%m-%d")
+    return sanitize(backtest_stock(symbol.upper(), start, end, 1))
+
+@app.get("/backtest-portfolio/{user_id}")
+def backtest_portfolio_route(user_id: str):
+    from agent.tools.backtest import backtest_portfolio
+    from backend.database     import get_trade_history
+    trades = get_trade_history(user_id)
+    if not trades:
+        return {"error": "No trades found"}
+    last     = trades[-1]
+    holdings = last["allocation"].get("holdings", [])
+    buy_date = last["created_at"][:10]
+    from datetime import datetime
+    sell_date = datetime.now().strftime("%Y-%m-%d")
+    return sanitize(backtest_portfolio(holdings, buy_date, sell_date))

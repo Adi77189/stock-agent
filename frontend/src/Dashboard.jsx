@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import axios from "axios"
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -107,6 +107,7 @@ export default function Dashboard() {
   const [scenarios,    setScenarios]    = useState(null)
   const [performance,  setPerformance]  = useState(null)
   const [rebalance,    setRebalance]    = useState(null)
+  const [pnl, setPnl] = useState(null)
 
   // Agent status cycling while loading
   useEffect(() => {
@@ -204,6 +205,16 @@ export default function Dashboard() {
     setPerformance(p.data)
     setRebalance(r.data)
   } catch(e) { setError("Insights: " + e.message) }
+}
+  const loadPnl = async () => {
+  try {
+    const res = await axios.get(`${API}/pnl/demo_user`)
+    setPnl(res.data)
+    // Send stop-loss alerts
+    if (res.data.stop_loss_alerts?.length > 0) {
+      setError(` Stop-loss hit: ${res.data.stop_loss_alerts.join(", ")}`)
+    }
+  } catch(e) { setError("P&L: " + e.message) }
 }
 
   const pieData = result?.allocation?.holdings?.map(h => ({
@@ -393,7 +404,14 @@ export default function Dashboard() {
               }}>
                   Insights
               </button>
-
+              <button onClick={loadPnl} style={{
+                padding: "10px 16px", background: "transparent",
+                border: `1px solid ${C.border}`,
+                color: C.sub, borderRadius: 8,
+                fontSize: 12, cursor: "pointer"
+              }}>
+                P&L
+              </button>
               {[
                 { label: "Prices",   fn: loadWatchlist, loading: wlLoading },
                 { label: "Pulse",    fn: loadMood },
@@ -1154,6 +1172,75 @@ export default function Dashboard() {
           </div>
         )}
 
+        {pnl && pnl.positions && (
+  <div style={{
+    background: C.surface, border: `1px solid ${C.border}`,
+    borderRadius: 14, padding: "20px 24px", marginBottom: 24
+  }}>
+    <div style={{
+      display: "flex", justifyContent: "space-between",
+      alignItems: "center", marginBottom: 16
+    }}>
+      <h3 style={{
+        fontFamily: "'Space Grotesk', sans-serif",
+        fontWeight: 600, fontSize: 14, color: C.white
+      }}>Portfolio P&L</h3>
+      <span style={{
+        fontWeight: 700, fontSize: 16,
+        color: pnl.total_pnl >= 0 ? C.green : C.red
+      }}>
+        {pnl.total_pnl >= 0 ? "▲" : "▼"} ₹{Math.abs(pnl.total_pnl)} ({pnl.total_pnl_pct}%)
+      </span>
+    </div>
+
+    {pnl.positions.map((p, i) => (
+      <div key={i} style={{
+        display: "flex", justifyContent: "space-between",
+        padding: "10px 0", borderBottom: `1px solid ${C.border}`,
+        alignItems: "center", fontSize: 13
+      }}>
+        <div>
+          <span style={{ fontWeight: 700, color: C.accent }}>
+            {p.symbol}
+          </span>
+          {p.sl_hit && (
+            <span style={{
+              marginLeft: 8, fontSize: 11,
+              color: C.red, fontWeight: 700
+            }}>⚠️ SL HIT</span>
+          )}
+        </div>
+        <span style={{ color: C.muted }}>
+          ₹{p.buy_price} → ₹{p.current_price}
+        </span>
+        <span style={{ color: C.muted }}>
+          {p.shares} shares
+        </span>
+        <span style={{
+          fontWeight: 700,
+          color: p.pnl >= 0 ? C.green : C.red
+        }}>
+          {p.pnl >= 0 ? "▲" : "▼"} ₹{Math.abs(p.pnl)} ({p.pnl_pct}%)
+        </span>
+        <span style={{ fontSize: 11, color: C.muted }}>
+          SL: ₹{p.stop_loss}
+        </span>
+      </div>
+    ))}
+
+    <div style={{
+      display: "flex", justifyContent: "space-between",
+      marginTop: 12, fontSize: 12, color: C.sub
+    }}>
+      <span>Invested: ₹{pnl.total_invested?.toLocaleString("en-IN")}</span>
+      <span>Current: ₹{pnl.total_current?.toLocaleString("en-IN")}</span>
+      <span style={{
+        color: pnl.overall_status === "PROFIT" ? C.green : C.red,
+        fontWeight: 700
+      }}>{pnl.overall_status}</span>
+    </div>
+  </div>
+)}
         {/* ── SIP Setup ──────────────────────────────────── */}
         <div style={{
           background: C.surface, border: `1px solid ${C.border}`,

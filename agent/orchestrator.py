@@ -229,6 +229,12 @@ def run_agent(budget: float,
     if execute:
         from agent.tools.broker import place_all_orders
         order_results = place_all_orders(plan)
+    # Send Telegram notification
+    try:
+        from agent.notifications import notify_trade_executed
+        notify_trade_executed(plan, "paper" if paper_mode else "live")
+    except Exception as e:
+        print(f"Notification error: {e}")
 
     # Performance tracking (from DB if available)
     performance = {}
